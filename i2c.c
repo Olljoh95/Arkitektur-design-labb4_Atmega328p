@@ -8,7 +8,15 @@
 #include "i2c.h"
 
 void i2c_init(void) {
-	// ...
+	/*Calculate a bit rate of 100kHz*/
+	
+	TWBR = 0x12; //Set bit rate divisiondivision value
+	TWSR = 0x4; //Set bit rate prescale 
+	/*16+2[TWBR] * [TWSR] = 160 */
+
+	/*16 000 000 / 160 = 100 000 = 100kHz*/
+	
+	TWCR |= (1<<TWEN); //Set the third bit of the TWI Control Register  
 }
 
 void i2c_meaningful_status(uint8_t status) {
@@ -55,19 +63,48 @@ void i2c_meaningful_status(uint8_t status) {
 }
 
 inline void i2c_start() {
-	// ...
+	/* 
+	The TWCR is used to control the operation of the TWI. 
+	It is used to enable the TWI, to initiate a Master access 
+	by applying a START condition to the bus, to generate a Receiver acknowledge,
+	to generate a stop condition, 
+	and to control halting of the bus while the data to be written to the bus are written to the TWDR.
+	It also indicates a write collision if data is attempted written to TWDR while the register is inaccessible
+
+	TWINT = 8th bit, TWI Interrupt flag. By setting it to 1 we clear it.
+
+	TWSTA = 6th bit, TWI Start Condition. The application writes the 
+	TWSTA bit to one when it desires to become a Master on the 2-wire Serial Bus.
+
+	TWEN = Third bit, TWI Enable Bit. The TWEN bit enables TWI operation and activates the TWI interface.
+	*/
+	TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN); //Send START condition
+
+	/*Wait for TWINT Flag to be set.
+	 This indicates that the START condition has been transmitted*/
+	while(!(TWCR & (1<<TWINT))); 
 }
 
 inline void i2c_stop() {
-	// ...
+	/*Writing the TWSTO bit to one in Master mode will generate a STOP
+	condition on the 2-wire Serial Bus.
+	When the STOP condition is executed on the bus, the TWSTO bit is cleared automatically.
+	In Slave mode, setting the TWSTO bit can be used to recover from an error condition. */
+
+	TWCR = (1<<TWINT)|(1<<TWEN) | (1<<TWSTO); //Transmit STOP condition
+
+	while(TWCR & (1<<TWSTO)); //Wait for STOP condition to be executed
+
 }
 
 inline uint8_t i2c_get_status(void) {
-	// ...
+	return (TWSR & 0xF8); //Check value of TWI Status register
 }
 
 inline void i2c_xmit_addr(uint8_t address, uint8_t rw) {
-	// ...
+	TWDR = (address & 0xFE) | (rw & 0x1); //Load SLA + R/W into TWI Data Register (0 = write, 1 = read)
+	TWCR = (1<<TWINT) | (1<<TWEN); //Clear TWINT flag,
+	while(!(TWCR & (1<<TWINT)));
 }
 
 inline void i2c_xmit_byte(uint8_t data) {
