@@ -7,7 +7,14 @@
 
 #include "i2c.h"
 
+#define EEPROM_ADDR 0xa0 //0b1010 0000
+
+// I2C Read/Write flags
+#define I2C_R	1
+#define I2C_W	0
+
 void i2c_init(void) {
+	/*Calculate a bit rate of 100kHz*/
 	/*Calculate a bit rate of 100kHz*/
 	
 	TWBR = 0x12; //Set bit rate divisiondivision value
@@ -91,14 +98,15 @@ inline void i2c_stop() {
 	When the STOP condition is executed on the bus, the TWSTO bit is cleared automatically.
 	In Slave mode, setting the TWSTO bit can be used to recover from an error condition. */
 
-	TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO); //Transmit STOP condition
+	TWCR = (1<<TWINT) | (1<<TWSTO) | (1<<TWEN); //Transmit STOP condition
 
-	while(TWCR & (1<<TWSTO)); //Wait for STOP condition to be executed
+	while((TWCR & (1<<TWSTO))); //Wait for STOP condition to be executed
 
 }
 
 inline uint8_t i2c_get_status(void) {
-	return (TWSR & 0xF8); //Check value of TWI Status register
+	uint8_t status = TWSR & 0xF8; //Check value of TWI Status register, load into variable
+	return status; //return variable
 }
 
 inline void i2c_xmit_addr(uint8_t address, uint8_t rw) {
@@ -112,25 +120,26 @@ inline void i2c_xmit_byte(uint8_t data) {
 	TWCR = (1<<TWINT) | (1<<TWEN); //Clear TWINT flag to start transmission of data
 	while(!(TWCR & (1<<TWINT)));
 }
+/*
+Function not used and therefore commented out
 
 inline uint8_t i2c_read_ACK() {
 	TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWEA);
 	while(!(TWCR & (1<<TWINT)));
 	return TWDR;
 }
+*/
 
 inline uint8_t i2c_read_NAK() {
-	TWCR = (1<<TWINT) | (1<<TWEN);
+	TWCR = (1<<TWINT) | (1<<TWEN); //Clear TWINT flag to start transmission of address
 	while(!(TWCR & (1<<TWINT)));
 	return TWDR;
 }
 
 inline void eeprom_wait_until_write_complete() {
-	uint8_t status = 0;
-	while(status != 0x18) {
+	while(i2c_get_status() != 0x18) {
 		i2c_start();
-		i2c_xmit_addr(EEPROM_ADDR,0);
-		status = i2c_get_status();
+		i2c_xmit_addr(EEPROM_ADDR,0); //0 = write
 	}
 }
 
@@ -148,21 +157,9 @@ uint8_t eeprom_read_byte(uint8_t addr) {
 
 void eeprom_write_byte(uint8_t addr, uint8_t data) {
 	i2c_start();
-	i2c_xmit_addr(EEPROM_ADDR, 0);
+	i2c_xmit_addr(EEPROM_ADDR, 0); //0 = write
 	i2c_xmit_byte(addr);
-	i2c_start();
-	i2c_xmit_addr(EEPROM_ADDR, 1);
 	i2c_xmit_byte(data);
 	i2c_stop();
 	eeprom_wait_until_write_complete();
-}
-
-
-
-void eeprom_write_page(uint8_t addr, uint8_t *data) {
-	// ... (VG)
-}
-
-void eeprom_sequential_read(uint8_t *buf, uint8_t start_addr, uint8_t len) {
-	// ... (VG)
 }
