@@ -91,7 +91,7 @@ inline void i2c_stop() {
 	When the STOP condition is executed on the bus, the TWSTO bit is cleared automatically.
 	In Slave mode, setting the TWSTO bit can be used to recover from an error condition. */
 
-	TWCR = (1<<TWINT)|(1<<TWEN) | (1<<TWSTO); //Transmit STOP condition
+	TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO); //Transmit STOP condition
 
 	while(TWCR & (1<<TWSTO)); //Wait for STOP condition to be executed
 
@@ -103,33 +103,58 @@ inline uint8_t i2c_get_status(void) {
 
 inline void i2c_xmit_addr(uint8_t address, uint8_t rw) {
 	TWDR = (address & 0xFE) | (rw & 0x1); //Load SLA + R/W into TWI Data Register (0 = write, 1 = read)
-	TWCR = (1<<TWINT) | (1<<TWEN); //Clear TWINT flag,
+	TWCR = (1<<TWINT) | (1<<TWEN); //Clear TWINT flag to start transmission of address
 	while(!(TWCR & (1<<TWINT)));
 }
 
 inline void i2c_xmit_byte(uint8_t data) {
-	TWDR = data;
-	TWCR = (1<<TWINT) | (1<<TWEN);
+	TWDR = data; //Load data in to TWI Data Register
+	TWCR = (1<<TWINT) | (1<<TWEN); //Clear TWINT flag to start transmission of data
+	while(!(TWCR & (1<<TWINT)));
 }
 
 inline uint8_t i2c_read_ACK() {
-	// ...
+	TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWEA);
+	while(!(TWCR & (1<<TWINT)));
+	return TWDR;
 }
 
 inline uint8_t i2c_read_NAK() {
-	// ...
+	TWCR = (1<<TWINT) | (1<<TWEN);
+	while(!(TWCR & (1<<TWINT)));
+	return TWDR;
 }
 
 inline void eeprom_wait_until_write_complete() {
-	// ...
+	uint8_t status = 0;
+	while(status != 0x18) {
+		i2c_start();
+		i2c_xmit_addr(EEPROM_ADDR,0);
+		status = i2c_get_status();
+	}
 }
 
 uint8_t eeprom_read_byte(uint8_t addr) {
-	// ...
+	i2c_start();
+	i2c_xmit_addr(EEPROM_ADDR,0);
+	i2c_xmit_byte(addr);
+	i2c_start();
+	i2c_xmit_addr(EEPROM_ADDR, 1);
+	uint8_t received = i2c_read_NAK();
+	i2c_stop();
+	return received;
+
 }
 
 void eeprom_write_byte(uint8_t addr, uint8_t data) {
-	// ...
+	i2c_start();
+	i2c_xmit_addr(EEPROM_ADDR, 0);
+	i2c_xmit_byte(addr);
+	i2c_start();
+	i2c_xmit_addr(EEPROM_ADDR, 1);
+	i2c_xmit_byte(data);
+	i2c_stop();
+	eeprom_wait_until_write_complete();
 }
 
 

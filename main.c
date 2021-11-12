@@ -19,6 +19,12 @@ void main (void) {
 
 	sei();
 
+	uint8_t manufacurer_code = 0xFA;
+	uint8_t start_addr = 0x10;
+
+	
+
+
 	while (1) {
 
 	}
