@@ -7,14 +7,13 @@
 
 #include "i2c.h"
 
-#define EEPROM_ADDR 0xa0 //0b1010 0000
+#define EEPROM_CONTROL_BYTE 0xA0 //0b1010 0000
 
-// I2C Read/Write flags
+/*I2C Read/Write flags*/
 #define I2C_R	1
 #define I2C_W	0
 
 void i2c_init(void) {
-	/*Calculate a bit rate of 100kHz*/
 	/*Calculate a bit rate of 100kHz*/
 	
 	TWBR = 0x12; //Set bit rate divisiondivision value
@@ -112,54 +111,55 @@ inline uint8_t i2c_get_status(void) {
 inline void i2c_xmit_addr(uint8_t address, uint8_t rw) {
 	TWDR = (address & 0xFE) | (rw & 0x1); //Load SLA + R/W into TWI Data Register (0 = write, 1 = read)
 	TWCR = (1<<TWINT) | (1<<TWEN); //Clear TWINT flag to start transmission of address
-	while(!(TWCR & (1<<TWINT)));
-}
+	while(!(TWCR & (1<<TWINT))); //Wait for TWINT Flag to be set.
 
 inline void i2c_xmit_byte(uint8_t data) {
 	TWDR = data; //Load data in to TWI Data Register
 	TWCR = (1<<TWINT) | (1<<TWEN); //Clear TWINT flag to start transmission of data
-	while(!(TWCR & (1<<TWINT)));
+	while(!(TWCR & (1<<TWINT))); //Wait for TWINT Flag to be set.
 }
-/*
-Function not used and therefore commented out
+
+
+//Function not used and therefore commented out
 
 inline uint8_t i2c_read_ACK() {
-	TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWEA);
-	while(!(TWCR & (1<<TWINT)));
-	return TWDR;
+	TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWEA); //Data byte will be received and ACK will be returned
+	while(!(TWCR & (1<<TWINT))); //Wait for TWINT Flag to be set.
+	return TWDR;		//Return byte in TWI Data Register
 }
-*/
+
 
 inline uint8_t i2c_read_NAK() {
-	TWCR = (1<<TWINT) | (1<<TWEN); //Clear TWINT flag to start transmission of address
-	while(!(TWCR & (1<<TWINT)));
-	return TWDR;
+	TWCR = (1<<TWINT) | (1<<TWEN); //Data byte will be received and NOT ACK will be returned
+	while(!(TWCR & (1<<TWINT)));  //Wait for TWINT Flag to be set.
+	return TWDR;				//Return byte in TWI Data Register
 }
 
 inline void eeprom_wait_until_write_complete() {
-	while(i2c_get_status() != 0x18) {
-		i2c_start();
-		i2c_xmit_addr(EEPROM_ADDR,0); //0 = write
+	/*0x18 = SLA+W transmitted, ACK received*/
+	while(i2c_get_status() != 0x18) {	//While master is not transmiting
+		i2c_start();		//Send start condition
+		i2c_xmit_addr(EEPROM_CONTROL_BYTE,I2C_W);	//Send control byte and write-mode bit
 	}
 }
 
 uint8_t eeprom_read_byte(uint8_t addr) {
-	i2c_start();
-	i2c_xmit_addr(EEPROM_ADDR,0);
-	i2c_xmit_byte(addr);
-	i2c_start();
-	i2c_xmit_addr(EEPROM_ADDR, 1);
-	uint8_t received = i2c_read_NAK();
-	i2c_stop();
-	return received;
+	i2c_start();				//Send start condition
+	i2c_xmit_addr(EEPROM_CONTROL_BYTE,I2C_W);	//Send control byte and write-mode bit
+	i2c_xmit_byte(addr);		//Send address as byte
+	i2c_start();				//send Start condition
+	i2c_xmit_addr(EEPROM_CONTROL_BYTE, I2C_R);	//Send control byte and read-mode bit
+	uint8_t received = i2c_read_NAK();  //Load data into variable
+	i2c_stop();					//Send stop condition
+	return received;			//return data
 
 }
 
 void eeprom_write_byte(uint8_t addr, uint8_t data) {
-	i2c_start();
-	i2c_xmit_addr(EEPROM_ADDR, 0); //0 = write
-	i2c_xmit_byte(addr);
-	i2c_xmit_byte(data);
-	i2c_stop();
-	eeprom_wait_until_write_complete();
+	i2c_start();			//send start condition
+	i2c_xmit_addr(EEPROM_CONTROL_BYTE, I2C_W);	//Send control byte and write-mode bit
+	i2c_xmit_byte(addr);		//send address as byte
+	i2c_xmit_byte(data);		//send data as byte
+	i2c_stop();					//send stop condition
+	eeprom_wait_until_write_complete(); //wait for status change
 }

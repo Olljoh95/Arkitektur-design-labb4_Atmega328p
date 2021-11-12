@@ -11,7 +11,7 @@
 #include "serial.h"
 #include "timer.h"
 
-#define EEPROM_WRITE_TO_ADDR 0x10
+#define EEPROM_WRITE_TO_ADDR 0x10 //Presupposed address
 
 void main (void) {
 
@@ -20,7 +20,8 @@ void main (void) {
 
 	sei();
 
-	//uint8_t manufacturer_code = 0xFA;
+	//uint8_t manufacturer_code = 0xFA; Can be used for testing
+
 	eeprom_write_byte(EEPROM_WRITE_TO_ADDR, 'O');
 	eeprom_write_byte(EEPROM_WRITE_TO_ADDR+1, 'l');
 	eeprom_write_byte(EEPROM_WRITE_TO_ADDR+2, 'l');
@@ -28,16 +29,16 @@ void main (void) {
 
 	uint8_t counter = 0;
 
-	i2c_meaningful_status(i2c_get_status()); //print out status of 
+	i2c_meaningful_status(i2c_get_status()); //print out status of eeprom
 
 	while (1) {
 		_delay_ms(100);
 
-		printf_P(PSTR("%c"),eeprom_read_byte(EEPROM_WRITE_TO_ADDR+counter));
+		printf_P(PSTR("%c"),eeprom_read_byte(EEPROM_WRITE_TO_ADDR+counter)); //Iterate through memory addresses
 		counter++;
 		if(counter == 4) {
 			counter = 0;
-			printf_P(PSTR("\r\n"));
+			printf_P(PSTR("\r\n")); //add newline
 		}
 
 	}
